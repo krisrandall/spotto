@@ -1,12 +1,21 @@
 
 // car.dart
 import 'package:flame/components.dart';
-import 'package:flame/events.dart'; // Updated import
 
-class Car extends SpriteComponent with TapCallbacks { // Updated mixin
+enum CarType {
+  grey,
+  green,
+  yellow,
+}
+
+class Car extends SpriteComponent { // Updated mixin
+
+  CarType carType;
+
   Car({
     required Vector2 position,
     required Vector2 size,
+    required this.carType,
   }) : super(position: position, size: size);
   
   @override
@@ -15,17 +24,14 @@ class Car extends SpriteComponent with TapCallbacks { // Updated mixin
     
     // Load the car sprite
     // You'll need to add a car image to your assets folder
-    sprite = await Sprite.load('car.png');
+    sprite = switch (carType) {
+      CarType.grey => await Sprite.load('car.png'),
+      CarType.green => await Sprite.load('green.png'),
+      CarType.yellow => await Sprite.load('yellow.png'),
+    };
     
     // Set the anchor to the center for better positioning
     anchor = Anchor.center;
   }
-  
-  // Updated tap handler with modern Flame API
-  @override
-  void onTapDown(TapDownEvent event) {
-    // Optional: Implement what happens when a car is tapped
-    // For example, you could change its color or make it move
-    super.onTapDown(event);
-  }
+
 }

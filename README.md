@@ -1,4 +1,4 @@
-# spotto
+# Spotto
 
 The family car game of "Spotto" but as a mobile app.
 

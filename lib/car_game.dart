@@ -34,7 +34,7 @@ class CarGame extends FlameGame with TapCallbacks { // Updated mixin
     super.update(dt);
     
     // 1 in 100 chance to add a new car
-    if (random.nextInt(100) == 0) {
+    if (random.nextInt(50) == 0) {
       _addRandomCar();
     }
     
@@ -48,11 +48,13 @@ class CarGame extends FlameGame with TapCallbacks { // Updated mixin
     // Generate random position within the world
     final x = random.nextDouble() * worldWidth;
     final y = random.nextDouble() * worldHeight;
+    final carType = CarType.values[random.nextInt(CarType.values.length)];
     
     // Create a new car
     final car = Car(
       position: Vector2(x, y),
       size: Vector2(50, 30), // Size of the car sprite
+      carType: carType,
     );
     
     // Add to our list and to the game
