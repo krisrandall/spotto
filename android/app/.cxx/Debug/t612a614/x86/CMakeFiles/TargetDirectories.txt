@@ -1,0 +1,2 @@
+/home/krisrandall/Dev/games/spotto/android/app/.cxx/Debug/t612a614/x86/CMakeFiles/edit_cache.dir
+/home/krisrandall/Dev/games/spotto/android/app/.cxx/Debug/t612a614/x86/CMakeFiles/rebuild_cache.dir

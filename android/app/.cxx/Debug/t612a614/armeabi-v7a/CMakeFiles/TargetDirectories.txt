@@ -1,0 +1,2 @@
+/home/krisrandall/Dev/games/spotto/android/app/.cxx/Debug/t612a614/armeabi-v7a/CMakeFiles/edit_cache.dir
+/home/krisrandall/Dev/games/spotto/android/app/.cxx/Debug/t612a614/armeabi-v7a/CMakeFiles/rebuild_cache.dir
