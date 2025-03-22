@@ -5,6 +5,8 @@ import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flame/palette.dart';
 import 'package:flutter/material.dart';
+import 'package:spotto/tree.dart';
+import 'package:spotto/world_object.dart';
 import 'car.dart';
 import 'game_score.dart';
 import 'ui_button.dart';
@@ -16,16 +18,18 @@ class CarGame extends FlameGame with TapCallbacks {
   static const worldHeight = 1000.0;
   
   // Viewport properties
-  static const viewportMinX = 350.0;
-  static const viewportMaxX = 650.0;
-  static const viewportMinY = 0.0;
-  static const viewportMaxY = 500.0;
+  static const viewportMinX = 0;
+  static const viewportMaxX = 1000;
+  static const viewportMinY = 0;
+  static const viewportMaxY = 600;
   
   // Car speed (pixels per second)
-  static const carSpeed = 120.0;
-  
+  static const carSpeed = 200.0;
+  static const treeSpeed = 100.0;
+
   // Game state
   final List<Car> cars = [];
+  final List<Tree> trees = [];
   final Random random = Random();
   final GameScore gameScore = GameScore();
   
@@ -113,67 +117,67 @@ Future<void> onLoad() async {
 }
 
   @override
-void onGameResize(Vector2 canvasSize) {
-  super.onGameResize(canvasSize);
-  
-  // Clear any existing UI components first (for screen rotation)
-  camera.viewport.children.whereType<UIButton>().forEach((button) => button.removeFromParent());
-  camera.viewport.children.whereType<ScoreDisplay>().forEach((display) => display.removeFromParent());
-  
-  // Update background elements on resize only if they've been initialized
-  if (hasBeenLoaded) {  // Add this check instead of skyBackground.isMounted
-    skyBackground.size = Vector2(canvasSize.x, canvasSize.y * 0.3);
-    roadBackground.position = Vector2(0, canvasSize.y * 0.3);
-    roadBackground.size = Vector2(canvasSize.x, canvasSize.y * 0.7);
+  void onGameResize(Vector2 canvasSize) {
+    super.onGameResize(canvasSize);
     
-    // Update windscreen size and position
-    final windscreenSprite = windscreen.sprite!;
-    final aspectRatio = windscreenSprite.srcSize.x / windscreenSprite.srcSize.y;
-    Vector2 windscreenSize;
+    // Clear any existing UI components first (for screen rotation)
+    camera.viewport.children.whereType<UIButton>().forEach((button) => button.removeFromParent());
+    camera.viewport.children.whereType<ScoreDisplay>().forEach((display) => display.removeFromParent());
     
-    if (canvasSize.x / canvasSize.y > aspectRatio) {
-      windscreenSize = Vector2(canvasSize.x, canvasSize.x / aspectRatio);
-    } else {
-      windscreenSize = Vector2(canvasSize.y * aspectRatio, canvasSize.y);
+    // Update background elements on resize only if they've been initialized
+    if (hasBeenLoaded) {  // Add this check instead of skyBackground.isMounted
+      skyBackground.size = Vector2(canvasSize.x, canvasSize.y * 0.3);
+      roadBackground.position = Vector2(0, canvasSize.y * 0.3);
+      roadBackground.size = Vector2(canvasSize.x, canvasSize.y * 0.7);
+      
+      // Update windscreen size and position
+      final windscreenSprite = windscreen.sprite!;
+      final aspectRatio = windscreenSprite.srcSize.x / windscreenSprite.srcSize.y;
+      Vector2 windscreenSize;
+      
+      if (canvasSize.x / canvasSize.y > aspectRatio) {
+        windscreenSize = Vector2(canvasSize.x, canvasSize.x / aspectRatio);
+      } else {
+        windscreenSize = Vector2(canvasSize.y * aspectRatio, canvasSize.y);
+      }
+      
+      windscreen.size = windscreenSize;
+      windscreen.position = Vector2(canvasSize.x / 2, canvasSize.y / 2);
     }
     
-    windscreen.size = windscreenSize;
-    windscreen.position = Vector2(canvasSize.x / 2, canvasSize.y / 2);
+    // Button dimensions based on screen size - max 30% of screen width
+    final buttonWidth = canvasSize.x * 0.3; // 30% of screen width
+    final buttonHeight = canvasSize.y * 0.08; // 8% of screen height
+    final bottomPadding = canvasSize.y * 0.05; // 5% of screen height from bottom
+    final sidePadding = canvasSize.x * 0.05; // 5% padding from sides
+    
+  // When creating UI buttons and score display
+  final spottoButton = UIButton(
+    position: Vector2(sidePadding, canvasSize.y - buttonHeight - bottomPadding),
+    size: Vector2(buttonWidth, buttonHeight),
+    onPressed: handleSpottoPressed,
+    spritePath: 'spotto.png',
+    priority: 100, // Highest priority - UI elements on top
+  );
+
+  final froggoButton = UIButton(
+    position: Vector2(canvasSize.x - buttonWidth - sidePadding, canvasSize.y - buttonHeight - bottomPadding),
+    size: Vector2(buttonWidth, buttonHeight),
+    onPressed: handleFroggoPressed,
+    spritePath: 'froggo.png',
+    priority: 100, // Highest priority - UI elements on top
+  );
+
+  final scoreDisplay = ScoreDisplay(
+    position: Vector2(canvasSize.x * 0.05, canvasSize.y * 0.05),
+    gameScore: gameScore,
+    priority: 100, // Highest priority - UI elements on top
+  );
+    // Add UI components to the camera viewport
+    camera.viewport.add(spottoButton);
+    camera.viewport.add(froggoButton);
+    camera.viewport.add(scoreDisplay);
   }
-  
-  // Button dimensions based on screen size - max 30% of screen width
-  final buttonWidth = canvasSize.x * 0.3; // 30% of screen width
-  final buttonHeight = canvasSize.y * 0.08; // 8% of screen height
-  final bottomPadding = canvasSize.y * 0.05; // 5% of screen height from bottom
-  final sidePadding = canvasSize.x * 0.05; // 5% padding from sides
-  
-// When creating UI buttons and score display
-final spottoButton = UIButton(
-  position: Vector2(sidePadding, canvasSize.y - buttonHeight - bottomPadding),
-  size: Vector2(buttonWidth, buttonHeight),
-  onPressed: handleSpottoPressed,
-  spritePath: 'spotto.png',
-  priority: 100, // Highest priority - UI elements on top
-);
-
-final froggoButton = UIButton(
-  position: Vector2(canvasSize.x - buttonWidth - sidePadding, canvasSize.y - buttonHeight - bottomPadding),
-  size: Vector2(buttonWidth, buttonHeight),
-  onPressed: handleFroggoPressed,
-  spritePath: 'froggo.png',
-  priority: 100, // Highest priority - UI elements on top
-);
-
-final scoreDisplay = ScoreDisplay(
-  position: Vector2(canvasSize.x * 0.05, canvasSize.y * 0.05),
-  gameScore: gameScore,
-  priority: 100, // Highest priority - UI elements on top
-);
-  // Add UI components to the camera viewport
-  camera.viewport.add(spottoButton);
-  camera.viewport.add(froggoButton);
-  camera.viewport.add(scoreDisplay);
-}
 
   @override
   void update(double dt) {
@@ -183,10 +187,16 @@ final scoreDisplay = ScoreDisplay(
     if (random.nextInt(100) == 0) {
       _addRandomCar();
     }
+
+    // 1 in 100 chance to add a new tree
+    if (random.nextInt(100) == 0) {
+      _addRandomTree();
+    }
     
     // Update all cars' positions and remove those that have reached the end
     List<Car> carsToRemove = [];
-    
+    List<Tree> treesToRemove = [];
+
     for (final car in cars) {
       // Move the car forward (increasing Y)
       car.worldPosition.y += carSpeed * dt;
@@ -208,7 +218,7 @@ final scoreDisplay = ScoreDisplay(
         carsToRemove.add(car);
       } else {
         // Update the visual representation of the car
-        updateCarProjection(car);
+        updateWorldObjectProjection(car);
       }
     }
     
@@ -217,6 +227,26 @@ final scoreDisplay = ScoreDisplay(
       car.removeFromParent();
       cars.remove(car);
     }
+
+
+    // Update all trees' positions and remove those that have reached the end
+    for (final tree in trees) {
+      tree.worldPosition.y += treeSpeed * dt;
+      
+      if (tree.worldPosition.y >= worldHeight) {
+        treesToRemove.add(tree);  
+      } else {
+        // Update the visual representation of the tree
+        updateWorldObjectProjection(tree);
+      }
+    }
+    
+    // Remove trees that have reached the end
+    for (final tree in treesToRemove) {
+      tree.removeFromParent();
+      trees.remove(tree);
+    }
+    
     
     // Update the wrong indicator if it's displayed
     if (wrongIndicator != null && wrongDisplayTime > 0) {
@@ -250,26 +280,33 @@ final scoreDisplay = ScoreDisplay(
     add(car);
     
     // Immediately update its projection
-    updateCarProjection(car);
+    updateWorldObjectProjection(car);
+  }
+
+  void _addRandomTree() async {
+    // Generate random X position within the viewport range, Y always starts at 0
+    final x = viewportMinX + random.nextDouble() * (viewportMaxX - viewportMinX);
+    final y = 0.0; // Trees always start at the horizon
+    
+    final worldPosition = Vector2(x, y);
+    final tree = Tree(
+      position: worldPosition.clone(),
+      size: Vector2(250, 250),
+    );
+    
+    // Add to our list and to the game
+    trees.add(tree);
+    add(tree);
+    
+    // Immediately update its projection
+    updateWorldObjectProjection(tree);
+    
   }
     
-  void updateCarProjection(Car car) {
-    // Check viewport bounds - if outside viewport (including past viewportMaxY), don't render
-    if (car.worldPosition.x < viewportMinX || 
-        car.worldPosition.x > viewportMaxX || 
-        car.worldPosition.y < viewportMinY || 
-        car.worldPosition.y > viewportMaxY) {
-      car.isVisible = false;
-      return;
-    }
-    
-    car.isVisible = true;
-
-    
-    
+  void updateWorldObjectProjection(WorldObject item) {
     // Calculate perspective values 
     // Normalize the Y position between 0 (furthest) and 1 (closest)
-    final normalizedDepth = car.worldPosition.y / viewportMaxY;
+    final normalizedDepth = item.worldPosition.y / viewportMaxY;
     
     // Apply exponential transformation for stronger depth effect
     // Using power function for exponential growth: y^2 gives a mild effect, y^3 stronger
@@ -277,15 +314,15 @@ final scoreDisplay = ScoreDisplay(
     
 
     // In the updateCarProjection method
-// Set priority for rendering order
-// Use a range between 0-40 so cars are above background but below windscreen
-car.priority = (40 * exponentialDepth).toInt();
+    // Set priority for rendering order
+    // Use a range between 0-40 so cars are above background but below windscreen
+    item.priority = (40 * exponentialDepth).toInt();
 
     // Calculate screen X with perspective narrowing
     final screenWidth = size.x;
     final worldCenterX = worldWidth / 2;
     final screenCenterX = screenWidth / 2;
-    final xOffsetFromCenter = car.worldPosition.x - worldCenterX;
+    final xOffsetFromCenter = item.worldPosition.x - worldCenterX;
     
     // NEW: Apply exponential horizontal spread - cars move away from center more dramatically as they approach
     // Use a higher exponent than for the depth to make this more pronounced
@@ -304,17 +341,17 @@ car.priority = (40 * exponentialDepth).toInt();
     final screenY = horizonPosition + (groundPosition - horizonPosition) * exponentialDepth;
     
     // Apply position
-    car.position = Vector2(perspectiveAdjustedX, screenY);
+    item.position = Vector2(perspectiveAdjustedX, screenY);
     
     // Scale with exponential growth for more dramatic size increase as cars approach
     // Minimum scale is 0.2, maximum is 1.0
     final baseScale = 0.2;
     final scaleRange = 2.8;
     final scale = baseScale + (scaleRange * exponentialDepth);
-    car.scale = Vector2.all(scale);
+    item.scale = Vector2.all(scale);
     
     // Set priority for rendering order
-    car.priority = (1000 * exponentialDepth).toInt();
+    item.priority = (1000 * exponentialDepth).toInt();
   }
 
   // Helper method to get only visible cars

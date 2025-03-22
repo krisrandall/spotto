@@ -1,6 +1,10 @@
 // car.dart
 import 'package:flame/components.dart';
-import 'dart:ui'; // Add this import for Canvas
+import 'dart:ui';
+
+import 'package:spotto/world_object.dart'; // Add this import for Canvas
+
+
 
 enum CarType {
   grey(
@@ -71,14 +75,12 @@ enum CarType {
   });
 }
 
-class Car extends PositionComponent {
+class Car extends WorldObject {
   CarType carType;
   bool _spotted = false;
   late SpriteComponent carSprite;
   SpriteComponent? spottedOverlay;
   
-  // Store the original world position, separate from the screen position
-  Vector2 worldPosition;
   
   // Control visibility with a boolean
   bool _isVisible = true;
@@ -87,8 +89,7 @@ class Car extends PositionComponent {
     required Vector2 position,
     required Vector2 size,
     required this.carType,
-  }) : worldPosition = position.clone(),
-       super(position: position, size: size) {
+  }) : super(position: position, size: size) {
     // Set anchor to center for the container component
     anchor = Anchor.center;
   }
