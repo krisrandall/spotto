@@ -4,8 +4,44 @@ import 'dart:ui'; // Add this import for Canvas
 
 enum CarType {
   grey(
-    frontSprite: 'car.png',
+    frontSprite: 'grey.png',
     sideSprite: 'car_side.png',
+    isFroggo: false,
+    isSpotto: false,
+  ),
+  purple(
+    frontSprite: 'purple.png',
+    sideSprite: 'purple_side.png',
+    isFroggo: false,
+    isSpotto: false,
+  ),
+  red(
+    frontSprite: 'red.png',
+    sideSprite: 'red_side.png',
+    isFroggo: false,
+    isSpotto: false,
+  ),
+  blue(
+    frontSprite: 'blue.png',
+    sideSprite: 'blue_side.png',
+    isFroggo: false,
+    isSpotto: false,
+  ),
+  pink(
+    frontSprite: 'pink.png',
+    sideSprite: 'pink_side.png',
+    isFroggo: false,
+    isSpotto: false,
+  ),
+  white(
+    frontSprite: 'white.png',
+    sideSprite: 'white_side.png',
+    isFroggo: false,
+    isSpotto: false,
+  ),
+  black(
+    frontSprite: 'black.png',
+    sideSprite: 'black_side.png',
     isFroggo: false,
     isSpotto: false,
   ),
