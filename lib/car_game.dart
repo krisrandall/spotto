@@ -7,10 +7,18 @@ import 'package:flame/palette.dart';
 import 'package:flutter/material.dart';
 import 'package:spotto/tree.dart';
 import 'package:spotto/world_object.dart';
+import 'package:spotto/title_screen.dart';
 import 'car.dart';
 import 'game_score.dart';
 import 'ui_button.dart';
 import 'score_display.dart';
+
+// Enum to track the current game state
+enum GameState {
+  titleScreen,
+  playing,
+  gameOver,
+}
 
 class CarGame extends FlameGame with TapCallbacks {
   // World size properties
@@ -28,6 +36,7 @@ class CarGame extends FlameGame with TapCallbacks {
   static const treeSpeed = 100.0;
 
   // Game state
+  GameState _gameState = GameState.titleScreen;
   final List<Car> cars = [];
   final List<Tree> trees = [];
   final Random random = Random();
@@ -37,6 +46,9 @@ class CarGame extends FlameGame with TapCallbacks {
   late RectangleComponent skyBackground;
   late GradientRectangleComponent roadBackground;
   late SpriteComponent windscreen;
+  
+  // Title screen component
+  TitleScreen? titleScreen;
   
   // Wrong answer indicator
   SpriteComponent? wrongIndicator;
@@ -54,6 +66,64 @@ class CarGame extends FlameGame with TapCallbacks {
     camera.viewfinder.zoom = 1.0;
     camera.moveTo(Vector2(worldWidth / 2, worldHeight / 2));
     
+    // Pre-verify asset loading for required resources
+    await _preloadCoreAssets();
+    
+    // Mark that the game has been loaded
+    hasBeenLoaded = true;
+    
+    // Load the title screen first
+    await _loadTitleScreen();
+  }
+  
+  // Method to preload core assets and handle errors gracefully
+  Future<void> _preloadCoreAssets() async {
+    try {
+      // Preload critical images
+      await images.loadAll([
+        'windscreen.png',
+        'wrong.png',
+        'spotto.png',
+        'froggo.png',
+      ]);
+    } catch (e) {
+      print('Warning: Some assets failed to load: $e');
+      // Continue anyway, we'll handle missing assets gracefully
+    }
+  }
+  
+  // Method to load the title screen
+  Future<void> _loadTitleScreen() async {
+    // Create the title screen
+    titleScreen = TitleScreen(
+      onStartGame: _startGame,
+    );
+    
+    // Add it to the camera's viewport, not the world
+    camera.viewport.add(titleScreen!);
+    
+    // Update game state
+    _gameState = GameState.titleScreen;
+  }
+  
+  // Method to start the game (called when start button is pressed)
+  void _startGame() {
+    // Change game state to playing first (prevents resizing issues)
+    _gameState = GameState.playing;
+    
+    // Remove the title screen
+    if (titleScreen != null) {
+      print('Removing title screen');
+      titleScreen!.removeFromParent();
+      titleScreen = null;
+    }
+    
+    // Load the game elements
+    _loadGameElements();
+  }
+  
+  // Load all game elements
+  Future<void> _loadGameElements() async {
     // Create sky background (light blue above horizon)
     skyBackground = RectangleComponent(
       position: Vector2(0, 0),
@@ -112,26 +182,68 @@ class CarGame extends FlameGame with TapCallbacks {
     // Pre-load the wrong indicator sprite
     await images.load('wrong.png');
 
-    // lets add  initial cars and trees
+    // Add initial cars and trees
     for (int i = 0; i < 5; i++) {
       _addRandomCar();
       _addRandomTree();
     }
     
-    // Mark that the game has been loaded
-    hasBeenLoaded = true;
+    // Add UI elements (buttons and score display)
+    _setupUIElements();
+  }
+  
+  void _setupUIElements() {
+    // Button dimensions based on screen size
+    final buttonWidth = size.x * 0.3; // 30% of screen width
+    final buttonHeight = size.y * 0.08; // 8% of screen height
+    final bottomPadding = size.y * 0.05; // 5% of screen height from bottom
+    final sidePadding = size.x * 0.05; // 5% padding from sides
+    
+    // Create UI buttons and score display
+    final spottoButton = UIButton(
+      position: Vector2(sidePadding, size.y - buttonHeight - bottomPadding),
+      size: Vector2(buttonWidth, buttonHeight),
+      onPressed: handleSpottoPressed,
+      spritePath: 'spotto.png',
+      priority: 100,
+    );
+
+    final froggoButton = UIButton(
+      position: Vector2(size.x - buttonWidth - sidePadding, size.y - buttonHeight - bottomPadding),
+      size: Vector2(buttonWidth, buttonHeight),
+      onPressed: handleFroggoPressed,
+      spritePath: 'froggo.png',
+      priority: 100,
+    );
+
+    final scoreDisplay = ScoreDisplay(
+      position: Vector2(size.x * 0.05, size.y * 0.05),
+      gameScore: gameScore,
+      priority: 100,
+    );
+    
+    // Add UI components to the camera viewport
+    camera.viewport.add(spottoButton);
+    camera.viewport.add(froggoButton);
+    camera.viewport.add(scoreDisplay);
   }
 
   @override
   void onGameResize(Vector2 canvasSize) {
     super.onGameResize(canvasSize);
     
+    // If in title screen state, just let the components handle themselves
+    if (_gameState == GameState.titleScreen) {
+      // Don't set up game UI elements, but we still need to continue
+      // to let the title screen handle its own resizing
+    }
+    
     // Clear any existing UI components first (for screen rotation)
     camera.viewport.children.whereType<UIButton>().forEach((button) => button.removeFromParent());
     camera.viewport.children.whereType<ScoreDisplay>().forEach((display) => display.removeFromParent());
     
     // Update background elements on resize only if they've been initialized
-    if (hasBeenLoaded) {  // Add this check instead of skyBackground.isMounted
+    if (hasBeenLoaded && _gameState == GameState.playing) {
       skyBackground.size = Vector2(canvasSize.x, canvasSize.y * 0.3);
       roadBackground.position = Vector2(0, canvasSize.y * 0.3);
       roadBackground.size = Vector2(canvasSize.x, canvasSize.y * 0.7);
@@ -149,52 +261,27 @@ class CarGame extends FlameGame with TapCallbacks {
       
       windscreen.size = windscreenSize;
       windscreen.position = Vector2(canvasSize.x / 2, canvasSize.y / 2);
+      
+      // Re-setup UI elements
+      _setupUIElements();
     }
-    
-    // Button dimensions based on screen size - max 30% of screen width
-    final buttonWidth = canvasSize.x * 0.3; // 30% of screen width
-    final buttonHeight = canvasSize.y * 0.08; // 8% of screen height
-    final bottomPadding = canvasSize.y * 0.05; // 5% of screen height from bottom
-    final sidePadding = canvasSize.x * 0.05; // 5% padding from sides
-    
-  // When creating UI buttons and score display
-  final spottoButton = UIButton(
-    position: Vector2(sidePadding, canvasSize.y - buttonHeight - bottomPadding),
-    size: Vector2(buttonWidth, buttonHeight),
-    onPressed: handleSpottoPressed,
-    spritePath: 'spotto.png',
-    priority: 100, // Highest priority - UI elements on top
-  );
-
-  final froggoButton = UIButton(
-    position: Vector2(canvasSize.x - buttonWidth - sidePadding, canvasSize.y - buttonHeight - bottomPadding),
-    size: Vector2(buttonWidth, buttonHeight),
-    onPressed: handleFroggoPressed,
-    spritePath: 'froggo.png',
-    priority: 100, // Highest priority - UI elements on top
-  );
-
-  final scoreDisplay = ScoreDisplay(
-    position: Vector2(canvasSize.x * 0.05, canvasSize.y * 0.05),
-    gameScore: gameScore,
-    priority: 100, // Highest priority - UI elements on top
-  );
-    // Add UI components to the camera viewport
-    camera.viewport.add(spottoButton);
-    camera.viewport.add(froggoButton);
-    camera.viewport.add(scoreDisplay);
   }
 
   @override
   void update(double dt) {
     super.update(dt);
     
-    // 1 in 100 chance to add a new car
+    // Only update game logic if in playing state
+    if (_gameState != GameState.playing) {
+      return;
+    }
+    
+    // 1 in 50 chance to add a new car
     if (random.nextInt(50) == 0) {
       _addRandomCar();
     }
 
-    // 1 in 100 chance to add a new tree
+    // 1 in 110 chance to add a new tree
     if (random.nextInt(110) == 0) {
       _addRandomTree();
     }
@@ -215,12 +302,6 @@ class CarGame extends FlameGame with TapCallbacks {
         car.worldPosition.y < viewportMinY || 
         car.worldPosition.y > viewportMaxY) 
       {
-        // this is a hack - but the AIs (and me) have no fucking idea how to 
-        // make a sprite disappear properly.
-        // so we'll just remove it from the list and it will be removed from the screen
-        // after the current frame is rendered.
-        // The whole "isVisible" logic is terrible actually - will need to be reworked 
-        // when/if we add the left and right view ports 
         carsToRemove.add(car);
       } else {
         // Update the visual representation of the car
@@ -233,7 +314,6 @@ class CarGame extends FlameGame with TapCallbacks {
       car.removeFromParent();
       cars.remove(car);
     }
-
 
     // Update all trees' positions and remove those that have reached the end
     for (final tree in trees) {
@@ -253,7 +333,6 @@ class CarGame extends FlameGame with TapCallbacks {
       trees.remove(tree);
     }
     
-    
     // Update the wrong indicator if it's displayed
     if (wrongIndicator != null && wrongDisplayTime > 0) {
       wrongDisplayTime -= dt;
@@ -271,9 +350,6 @@ class CarGame extends FlameGame with TapCallbacks {
       viewportMinX + random.nextDouble() * howFarFromSides : 
       viewportMaxX - random.nextDouble() * howFarFromSides;
     const y = 0.0; // Cars always start at the horizon
-
-
-    //print('x: $x   --- $viewportMinX  --- $viewportMaxX --- $howFarFromSides');
     
     // Choose a random car type
     final carTypes = CarType.values;
@@ -315,7 +391,6 @@ class CarGame extends FlameGame with TapCallbacks {
     
     // Immediately update its projection
     updateWorldObjectProjection(tree);
-    
   }
     
   void updateWorldObjectProjection(WorldObject item) {
@@ -327,8 +402,6 @@ class CarGame extends FlameGame with TapCallbacks {
     // Using power function for exponential growth: y^2 gives a mild effect, y^3 stronger
     final exponentialDepth = pow(normalizedDepth, 2.5).toDouble();
     
-
-    // In the updateCarProjection method
     // Set priority for rendering order
     // Use a range between 0-40 so cars are above background but below windscreen
     item.priority = (40 * exponentialDepth).toInt();
@@ -339,7 +412,7 @@ class CarGame extends FlameGame with TapCallbacks {
     final screenCenterX = screenWidth / 2;
     final xOffsetFromCenter = item.worldPosition.x - worldCenterX;
     
-    // NEW: Apply exponential horizontal spread - cars move away from center more dramatically as they approach
+    // Apply exponential horizontal spread - cars move away from center more dramatically as they approach
     // Use a higher exponent than for the depth to make this more pronounced
     final horizontalSpreadFactor = pow(normalizedDepth, 2.8).toDouble();
     
