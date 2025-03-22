@@ -21,7 +21,7 @@ class CarGame extends FlameGame with TapCallbacks {
   static const viewportMaxY = 500.0;
   
   // Car speed (pixels per second)
-  static const carSpeed = 50.0;
+  static const carSpeed = 120.0;
   
   // Game state
   final List<Car> cars = [];
@@ -103,6 +103,18 @@ class CarGame extends FlameGame with TapCallbacks {
       // Check if car has reached the end of the world
       if (car.worldPosition.y >= worldHeight) {
         carsToRemove.add(car);
+      } else if (car.worldPosition.x < viewportMinX || 
+        car.worldPosition.x > viewportMaxX || 
+        car.worldPosition.y < viewportMinY || 
+        car.worldPosition.y > viewportMaxY) 
+      {
+        // this is a hack - but the AIs (and me) have no fucking idea how to 
+        // make a sprite disappear properly.
+        // so we'll just remove it from the list and it will be removed from the screen
+        // after the current frame is rendered.
+        // The whole "isVisible" logic is terrible actually - will need to be reworked 
+        // when/if we add the left and right view ports 
+        carsToRemove.add(car);
       } else {
         // Update the visual representation of the car
         updateCarProjection(car);
@@ -128,8 +140,8 @@ class CarGame extends FlameGame with TapCallbacks {
     // Create a new car with world position
     final worldPosition = Vector2(x, y);
     final car = Car(
-      position: worldPosition.clone(), // Initial screen position matches world position
-      size: Vector2(50, 30),
+      position: worldPosition.clone(),
+      size: Vector2(300, 180),
       carType: randomType,
     );
     
@@ -140,63 +152,82 @@ class CarGame extends FlameGame with TapCallbacks {
     // Immediately update its projection
     updateCarProjection(car);
   }
-  
+    
+    
   void updateCarProjection(Car car) {
-    // In our world coordinates:
-    // - Higher Y values = closer to the viewer (bottom of screen)
-    // - Lower Y values = further from viewer (top of screen/horizon)
-    
-    // Skip cars outside our viewport
-    if (car.worldPosition.x < viewportMinX || car.worldPosition.x > viewportMaxX || 
-        car.worldPosition.y < viewportMinY || car.worldPosition.y > viewportMaxY) {
-      car.isVisible = false;
-      return;
-    }
-    
-    car.isVisible = true;
-    
-    // Calculate perspective values more explicitly
-    // closeness: 0.0 = furthest away (at horizon), 1.0 = closest to viewer
-    final closeness = car.worldPosition.y / viewportMaxY;
-    
-    // Convert world X to screen X with perspective
-    // - Objects in center stay in center
-    // - Objects off-center appear more centered as they get further away
-    final screenWidth = size.x;
-    final worldCenterX = worldWidth / 2;
-    final screenCenterX = screenWidth / 2;
-    final xOffsetFromCenter = car.worldPosition.x - worldCenterX;
-    // Apply less horizontal offset for distant objects (perspective narrowing)
-    final perspectiveAdjustedX = screenCenterX + xOffsetFromCenter * closeness;
-    
-    // Convert world Y to screen Y with perspective
-    // - High Y in world (close) = low Y on screen (bottom)
-    // - Low Y in world (far) = high Y on screen (top/horizon)
-    final screenHeight = size.y;
-    final horizonPosition = screenHeight * 0.4; // Horizon at 20% from top
-    final groundPosition = screenHeight * 0.6; // Ground at 90% from top (10% from bottom)
-    // Map world Y (0->500) to screen Y (horizon->ground)
-    final screenY = horizonPosition + (groundPosition - horizonPosition) * closeness;
-    
-    // Apply position
-    car.position = Vector2(perspectiveAdjustedX, screenY);
-    
-    // Scale based on distance - closer objects are larger
-    // Min scale = 0.2, Max scale = 1.0
-    final baseScale = 0.2;
-    final scaleRange = 0.8;
-    final scale = baseScale + (scaleRange * closeness);
-    car.scale = Vector2.all(scale);
-    
-    // Ensure closer objects render in front of distant objects
-    // Higher priority = rendered on top
-    car.priority = (1000 * closeness).toInt();
+  // Check viewport bounds - if outside viewport (including past viewportMaxY), don't render
+  if (car.worldPosition.x < viewportMinX || 
+      car.worldPosition.x > viewportMaxX || 
+      car.worldPosition.y < viewportMinY || 
+      car.worldPosition.y > viewportMaxY) {
+    car.isVisible = false;
+    return;
+  }
+  
+  car.isVisible = true;
+  
+  // Calculate perspective values 
+  // Normalize the Y position between 0 (furthest) and 1 (closest)
+  final normalizedDepth = car.worldPosition.y / viewportMaxY;
+  
+  // Apply exponential transformation for stronger depth effect
+  // Using power function for exponential growth: y^2 gives a mild effect, y^3 stronger
+  final exponentialDepth = pow(normalizedDepth, 2.5).toDouble();
+  
+  // Calculate screen X with perspective narrowing
+  final screenWidth = size.x;
+  final worldCenterX = worldWidth / 2;
+  final screenCenterX = screenWidth / 2;
+  final xOffsetFromCenter = car.worldPosition.x - worldCenterX;
+  
+  // NEW: Apply exponential horizontal spread - cars move away from center more dramatically as they approach
+  // Use a higher exponent than for the depth to make this more pronounced
+  final horizontalSpreadFactor = pow(normalizedDepth, 2.8).toDouble();
+  
+  // Adjust the X position more strongly as cars get closer
+  // The closer to viewportMaxY, the more the X offset is amplified
+  final perspectiveAdjustedX = screenCenterX + xOffsetFromCenter * (1.0 + horizontalSpreadFactor * 6.2);
+  
+  // Calculate screen Y with exponential acceleration
+  final screenHeight = size.y;
+  final horizonPosition = screenHeight * 0.3; // Horizon at 20% from top
+  final groundPosition = screenHeight * 0.6; // Ground at 90% from top
+  
+  // Apply exponential positioning for Y axis too
+  final screenY = horizonPosition + (groundPosition - horizonPosition) * exponentialDepth;
+  
+  // Apply position
+  car.position = Vector2(perspectiveAdjustedX, screenY);
+  
+  // Scale with exponential growth for more dramatic size increase as cars approach
+  // Minimum scale is 0.2, maximum is 1.0
+  final baseScale = 0.2;
+  final scaleRange = 2.8;
+  final scale = baseScale + (scaleRange * exponentialDepth);
+  car.scale = Vector2.all(scale);
+  
+  // Set priority for rendering order
+  car.priority = (1000 * exponentialDepth).toInt();
+}
+
+  // Helper method to get only visible cars
+  List<Car> getVisibleCars() {
+    return cars.where((car) => 
+      car.isVisible && 
+      car.worldPosition.x >= viewportMinX && 
+      car.worldPosition.x <= viewportMaxX &&
+      car.worldPosition.y >= viewportMinY && 
+      car.worldPosition.y <= viewportMaxY
+    ).toList();
   }
   
   void handleSpottoPressed() {
-    // Find the first unspotted Spotto car
+    // Get only visible cars
+    final visibleCars = getVisibleCars();
+    
+    // Find the first unspotted Spotto car that is visible
     try {
-      final spottoCar = cars.firstWhere(
+      final spottoCar = visibleCars.firstWhere(
         (car) => car.carType.isSpotto && !car.spotted,
       );
       
@@ -204,15 +235,18 @@ class CarGame extends FlameGame with TapCallbacks {
       spottoCar.spotted = true;
       gameScore.numCorrectSpottos++;
     } catch (e) {
-      // No unspotted Spotto cars found, count as wrong
+      // No unspotted Spotto cars found in the visible area, count as wrong
       gameScore.numWrongSpottos++;
     }
   }
   
   void handleFroggoPressed() {
-    // Find the first unspotted Froggo car
+    // Get only visible cars
+    final visibleCars = getVisibleCars();
+    
+    // Find the first unspotted Froggo car that is visible
     try {
-      final froggoCar = cars.firstWhere(
+      final froggoCar = visibleCars.firstWhere(
         (car) => car.carType.isFroggo && !car.spotted,
       );
       
@@ -220,7 +254,7 @@ class CarGame extends FlameGame with TapCallbacks {
       froggoCar.spotted = true;
       gameScore.numCorrectFroggos++;
     } catch (e) {
-      // No unspotted Froggo cars found, count as wrong
+      // No unspotted Froggo cars found in the visible area, count as wrong
       gameScore.numWrongFroggos++;
     }
   }
