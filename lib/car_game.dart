@@ -6,6 +6,7 @@ import 'package:flame/events.dart';
 import 'package:flame/palette.dart';
 import 'package:flutter/material.dart';
 import 'car.dart';
+import 'tree.dart';
 import 'game_score.dart';
 import 'ui_button.dart';
 import 'score_display.dart';
@@ -16,16 +17,18 @@ class CarGame extends FlameGame with TapCallbacks {
   static const worldHeight = 1000.0;
   
   // Viewport properties
-  static const viewportMinX = 350.0;
-  static const viewportMaxX = 650.0;
+  static const viewportMinX = 0;
+  static const viewportMaxX = 1000.0;
   static const viewportMinY = 0.0;
   static const viewportMaxY = 500.0;
   
-  // Car speed (pixels per second)
+  // Car and tree speeds (pixels per second)
   static const carSpeed = 120.0;
+  static const treeSpeed = 60.0; // Half the car speed
   
   // Game state
   final List<Car> cars = [];
+  final List<Tree> trees = [];
   final Random random = Random();
   final GameScore gameScore = GameScore();
   
@@ -108,6 +111,14 @@ Future<void> onLoad() async {
   // Pre-load the wrong indicator sprite
   await images.load('wrong.png');
   
+  // Pre-load tree sprites
+  await images.load('tree1.png');
+  await images.load('tree2.png');
+  await images.load('tree3.png');
+  await images.load('tree4.png');
+
+  
+  
   // Mark that the game has been loaded
   hasBeenLoaded = true;
 }
@@ -184,6 +195,11 @@ final scoreDisplay = ScoreDisplay(
       _addRandomCar();
     }
     
+    // 1 in 120 chance to add a new tree (slightly less frequent than cars)
+    if (random.nextInt(120) == 0) {
+      _addRandomTree();
+    }
+    
     // Update all cars' positions and remove those that have reached the end
     List<Car> carsToRemove = [];
     
@@ -218,6 +234,34 @@ final scoreDisplay = ScoreDisplay(
       cars.remove(car);
     }
     
+    // Update all trees' positions and remove those that have reached the end
+    List<Tree> treesToRemove = [];
+    
+    for (final tree in trees) {
+      // Move the tree forward (increasing Y) at half the car speed
+      tree.worldPosition.y += treeSpeed * dt;
+      
+      // Check if tree has reached the end of the world
+      if (tree.worldPosition.y >= worldHeight) {
+        treesToRemove.add(tree);
+      } else if (tree.worldPosition.x < viewportMinX || 
+        tree.worldPosition.x > viewportMaxX || 
+        tree.worldPosition.y < viewportMinY || 
+        tree.worldPosition.y > viewportMaxY) 
+      {
+        treesToRemove.add(tree);
+      } else {
+        // Update the visual representation of the tree
+        updateTreeProjection(tree);
+      }
+    }
+    
+    // Remove trees that have reached the end
+    for (final tree in treesToRemove) {
+      tree.removeFromParent();
+      trees.remove(tree);
+    }
+    
     // Update the wrong indicator if it's displayed
     if (wrongIndicator != null && wrongDisplayTime > 0) {
       wrongDisplayTime -= dt;
@@ -229,8 +273,11 @@ final scoreDisplay = ScoreDisplay(
   }
   
   void _addRandomCar() async {
-    // Generate random X position within the viewport range, Y always starts at 0
-    final x = viewportMinX + random.nextDouble() * (viewportMaxX - viewportMinX);
+    // Generate random X position on either left or right side
+    final x = random.nextBool()
+        ? random.nextDouble() * 400  // Left side: 0 to 400
+        : 600 + random.nextDouble() * 400;  // Right side: 600 to 1000
+    
     final y = 0.0; // Cars always start at the horizon
     
     // Choose a random car type
@@ -252,6 +299,36 @@ final scoreDisplay = ScoreDisplay(
     // Immediately update its projection
     updateCarProjection(car);
   }
+  
+void _addRandomTree() async {
+  // Make sure trees appear within the viewport
+  final x = random.nextBool()
+      ? viewportMinX + random.nextDouble() * 50  // Left side
+      : viewportMaxX - random.nextDouble() * 50; // Right side
+  
+  final y = 0.0; // Trees always start at the horizon
+  
+  // Choose a random tree type
+  final treeTypes = TreeType.values;
+  final randomType = treeTypes[random.nextInt(treeTypes.length)];
+  
+  // Create a new tree with world position - make it larger
+  final worldPosition = Vector2(x, y);
+  final tree = Tree(
+    position: worldPosition.clone(),
+    size: Vector2(300, 600), // Bigger trees that are easier to see
+    treeType: randomType,
+  );
+  
+  // Add to our list and to the game
+  trees.add(tree);
+  add(tree);
+  //print("Added tree at position: $x, $y"); // Debug print
+  
+  // Immediately update its projection
+  updateTreeProjection(tree);
+}
+
     
   void updateCarProjection(Car car) {
     // Check viewport bounds - if outside viewport (including past viewportMaxY), don't render
@@ -277,9 +354,9 @@ final scoreDisplay = ScoreDisplay(
     
 
     // In the updateCarProjection method
-// Set priority for rendering order
-// Use a range between 0-40 so cars are above background but below windscreen
-car.priority = (40 * exponentialDepth).toInt();
+    // Set priority for rendering order
+    // Use a range between 0-40 so cars are above background but below windscreen
+    car.priority = (40 * exponentialDepth).toInt();
 
     // Calculate screen X with perspective narrowing
     final screenWidth = size.x;
@@ -315,6 +392,64 @@ car.priority = (40 * exponentialDepth).toInt();
     
     // Set priority for rendering order
     car.priority = (1000 * exponentialDepth).toInt();
+  }
+  
+  void updateTreeProjection(Tree tree) {
+    // Check viewport bounds - if outside viewport (including past viewportMaxY), don't render
+    if (tree.worldPosition.x < viewportMinX || 
+        tree.worldPosition.x > viewportMaxX || 
+        tree.worldPosition.y < viewportMinY || 
+        tree.worldPosition.y > viewportMaxY) {
+      tree.isVisible = false;
+      return;
+    }
+    
+    tree.isVisible = true;
+    
+    // Calculate perspective values 
+    // Normalize the Y position between 0 (furthest) and 1 (closest)
+    final normalizedDepth = tree.worldPosition.y / viewportMaxY;
+    
+    // Apply exponential transformation for stronger depth effect
+    // Using power function for exponential growth: y^2 gives a mild effect, y^3 stronger
+    final exponentialDepth = pow(normalizedDepth, 2.5).toDouble();
+    
+    // Set priority for rendering order
+    // Use a range between 0-40 so trees are above background but below windscreen
+    tree.priority = (40 * exponentialDepth).toInt();
+
+    // Calculate screen X with perspective narrowing
+    final screenWidth = size.x;
+    final worldCenterX = worldWidth / 2;
+    final screenCenterX = screenWidth / 2;
+    final xOffsetFromCenter = tree.worldPosition.x - worldCenterX;
+    
+    // Apply exponential horizontal spread - trees move away from center more dramatically as they approach
+    final horizontalSpreadFactor = pow(normalizedDepth, 2.8).toDouble();
+    
+    // Adjust the X position more strongly as trees get closer
+    final perspectiveAdjustedX = screenCenterX + xOffsetFromCenter * (1.0 + horizontalSpreadFactor * 6.2);
+    
+    // Calculate screen Y with exponential acceleration
+    final screenHeight = size.y;
+    final horizonPosition = screenHeight * 0.3; // Horizon at 30% from top
+    final groundPosition = screenHeight * 0.6; // Ground at 90% from top
+    
+    // Apply exponential positioning for Y axis too
+    final screenY = horizonPosition + (groundPosition - horizonPosition) * exponentialDepth;
+    
+    // Apply position
+    tree.position = Vector2(perspectiveAdjustedX, screenY);
+    
+    // Scale with exponential growth for more dramatic size increase as trees approach
+    // Minimum scale is 0.2, maximum is 1.0
+    final baseScale = 0.2;
+    final scaleRange = 2.8;
+    final scale = baseScale + (scaleRange * exponentialDepth);
+    tree.scale = Vector2.all(scale);
+    
+    // Set priority for rendering order - trees should be behind cars
+    tree.priority = (800 * exponentialDepth).toInt();
   }
 
   // Helper method to get only visible cars
