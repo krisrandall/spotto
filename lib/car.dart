@@ -1,5 +1,6 @@
 // car.dart
 import 'package:flame/components.dart';
+import 'dart:ui'; // Add this import for Canvas
 
 enum CarType {
   grey(
@@ -40,13 +41,44 @@ class Car extends PositionComponent {
   late SpriteComponent carSprite;
   SpriteComponent? spottedOverlay;
   
+  // Store the original world position, separate from the screen position
+  Vector2 worldPosition;
+  
+  // Control visibility with a boolean
+  bool _isVisible = true;
+  
   Car({
     required Vector2 position,
     required Vector2 size,
     required this.carType,
-  }) : super(position: position, size: size) {
+  }) : worldPosition = position.clone(),
+       super(position: position, size: size) {
     // Set anchor to center for the container component
     anchor = Anchor.center;
+  }
+  
+  // Getter and setter for visibility
+  bool get isVisible => _isVisible;
+  set isVisible(bool value) {
+    _isVisible = value;
+    // When visibility changes, update the component's render state
+    if (value) {
+      // Make visible - ensure not removed from parent
+      if (parent != null) {
+        parent!.children.register();
+      }
+    } else {
+      // Make invisible - can be achieved by not calling render
+      // No direct removal needed since we'll just skip rendering
+    }
+  }
+  
+  @override
+  void render(Canvas canvas) {
+    // Only render if visible
+    if (_isVisible) {
+      super.render(canvas);
+    }
   }
   
   // Getter for the spotted property
