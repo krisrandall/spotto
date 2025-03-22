@@ -6,6 +6,8 @@ import 'game_score.dart';
 
 class ScoreDisplay extends PositionComponent {
   final GameScore gameScore;
+  @override
+  final int priority;
   final TextPaint textPaint = TextPaint(
     style: const TextStyle(
       fontSize: 32.0,
@@ -24,6 +26,7 @@ class ScoreDisplay extends PositionComponent {
   ScoreDisplay({
     required Vector2 position,
     required this.gameScore,
+    this.priority = 0,
   }) : super(position: position);
   
   @override
