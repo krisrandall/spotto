@@ -1,5 +1,3 @@
-
-
 // car_game.dart
 import 'dart:math';
 import 'package:flame/game.dart';
@@ -34,15 +32,31 @@ class CarGame extends FlameGame with TapCallbacks {
     // Center the camera on the world
     camera.moveTo(Vector2(worldWidth / 2, worldHeight / 2));
     
-    // Add UI buttons
-    final screenWidth = size.x;
-    final screenHeight = size.y;
+    // Set up responsive UI that will be added once we know the screen size
+    // Adding them in onGameResize ensures they're positioned correctly
+    // for the current screen size and orientation
+  }
+  
+  @override
+  void onGameResize(Vector2 canvasSize) {
+    super.onGameResize(canvasSize);
+    
+    // Clear any existing UI components first (for screen rotation)
+    camera.viewport.children.whereType<UIButton>().forEach((button) => button.removeFromParent());
+    camera.viewport.children.whereType<ScoreDisplay>().forEach((display) => display.removeFromParent());
+    
+    // Button dimensions based on screen size - max 30% of screen width
+    final buttonWidth = canvasSize.x * 0.3; // 30% of screen width
+    final buttonHeight = canvasSize.y * 0.08; // 8% of screen height
+    final bottomPadding = canvasSize.y * 0.05; // 5% of screen height from bottom
+    final sidePadding = canvasSize.x * 0.05; // 5% padding from sides
     
     // Add Spotto button (left bottom)
     final spottoButton = UIButton(
       text: 'Spotto',
-      position: Vector2(screenWidth * 0.25, screenHeight * 0.9),
-      size: Vector2(150, 60),
+      // Position from left edge with padding
+      position: Vector2(sidePadding, canvasSize.y - buttonHeight - bottomPadding),
+      size: Vector2(buttonWidth, buttonHeight),
       onPressed: handleSpottoPressed,
       color: Colors.yellow,
     );
@@ -50,19 +64,20 @@ class CarGame extends FlameGame with TapCallbacks {
     // Add Froggo button (right bottom)
     final froggoButton = UIButton(
       text: 'Froggo',
-      position: Vector2(screenWidth * 0.75, screenHeight * 0.9),
-      size: Vector2(150, 60),
+      // Position from right edge with padding
+      position: Vector2(canvasSize.x - buttonWidth - sidePadding, canvasSize.y - buttonHeight - bottomPadding),
+      size: Vector2(buttonWidth, buttonHeight),
       onPressed: handleFroggoPressed,
       color: Colors.green,
     );
     
-    // Add score display (top left)
+    // Add score display (top left with padding)
     final scoreDisplay = ScoreDisplay(
-      position: Vector2(50, 50),
+      position: Vector2(canvasSize.x * 0.05, canvasSize.y * 0.05),
       gameScore: gameScore,
     );
     
-    // Add UI components to the camera
+    // Add UI components to the camera viewport
     camera.viewport.add(spottoButton);
     camera.viewport.add(froggoButton);
     camera.viewport.add(scoreDisplay);
