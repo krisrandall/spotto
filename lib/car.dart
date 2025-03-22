@@ -1,4 +1,3 @@
-
 // car.dart
 import 'package:flame/components.dart';
 
@@ -35,24 +34,81 @@ enum CarType {
   });
 }
 
-class Car extends SpriteComponent {
+class Car extends PositionComponent {
   CarType carType;
-  bool spotted = false; // New property to track if this car has been spotted
+  bool _spotted = false;
+  late SpriteComponent carSprite;
+  SpriteComponent? spottedOverlay;
   
   Car({
     required Vector2 position,
     required Vector2 size,
     required this.carType,
-  }) : super(position: position, size: size);
+  }) : super(position: position, size: size) {
+    // Set anchor to center for the container component
+    anchor = Anchor.center;
+  }
+  
+  // Getter for the spotted property
+  bool get spotted => _spotted;
+  
+  // Setter for spotted property that adds the overlay when set to true
+  set spotted(bool value) {
+    if (value == true && _spotted == false) {
+      _addSpottedOverlay();
+    }
+    _spotted = value;
+  }
   
   @override
   Future<void> onLoad() async {
     await super.onLoad();
     
-    // Load the car sprite using the frontSprite path from CarType
-    sprite = await Sprite.load(carType.frontSprite);
+    // Create a sprite component for the car instead of being one
+    final sprite = await Sprite.load(carType.frontSprite);
     
-    // Set the anchor to the center for better positioning
-    anchor = Anchor.center;
+    // Calculate the aspect ratio of the sprite to avoid distortion
+    final spriteWidth = sprite.srcSize.x;
+    final spriteHeight = sprite.srcSize.y;
+    final aspectRatio = spriteWidth / spriteHeight;
+    
+    // Use the container's size but maintain sprite aspect ratio
+    final spriteSize = Vector2(
+      size.x, 
+      size.x / aspectRatio
+    );
+    
+    // Create car sprite component
+    carSprite = SpriteComponent(
+      sprite: sprite,
+      size: spriteSize,
+      anchor: Anchor.center,
+    );
+    
+    // Center the sprite within the container
+    carSprite.position = size / 2;
+    
+    // Add the car sprite as a child
+    add(carSprite);
+  }
+  
+  // Add the spotted overlay sprite
+  Future<void> _addSpottedOverlay() async {
+    // Load the spotted overlay sprite
+    final spotSprite = await Sprite.load('spotted.png');
+    
+    // Create the overlay component with the same size as the car sprite
+    spottedOverlay = SpriteComponent(
+      sprite: spotSprite,
+      size: carSprite.size,
+      position: carSprite.position,
+      anchor: Anchor.center,
+    );
+    
+    // Set higher priority to render on top
+    spottedOverlay!.priority = 10;
+    
+    // Add the overlay as a child component
+    add(spottedOverlay!);
   }
 }
