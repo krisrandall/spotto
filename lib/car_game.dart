@@ -20,9 +20,8 @@ class CarGame extends FlameGame with TapCallbacks {
   static const viewportMinY = 0.0;
   static const viewportMaxY = 500.0;
   
-  // 3D perspective properties
-  static const horizonY = 100.0; // Y position of the horizon line in screen space
-  static const vanishingPointY = 0.2; // Position of the vanishing point (0-1, percentage of screen height)
+  // Car speed (pixels per second)
+  static const carSpeed = 50.0;
   
   // Game state
   final List<Car> cars = [];
@@ -33,7 +32,7 @@ class CarGame extends FlameGame with TapCallbacks {
   Future<void> onLoad() async {
     await super.onLoad();
     
-    // We no longer need to move the camera since we'll be doing our own projection
+    // Set up camera to view our 1000x1000 world
     camera.viewfinder.visibleGameSize = Vector2(worldWidth, worldHeight);
     camera.viewfinder.zoom = 1.0;
     camera.moveTo(Vector2(worldWidth / 2, worldHeight / 2));
@@ -90,34 +89,46 @@ class CarGame extends FlameGame with TapCallbacks {
     super.update(dt);
     
     // 1 in 100 chance to add a new car
-    if (random.nextInt(20) == 0) {
+    if (random.nextInt(100) == 0) {
       _addRandomCar();
     }
     
-    // 1 in 100 chance to remove a car if there are any
-    if (cars.isNotEmpty && random.nextInt(100) == 0) {
-      _removeRandomCar();
+    // Update all cars' positions and remove those that have reached the end
+    List<Car> carsToRemove = [];
+    
+    for (final car in cars) {
+      // Move the car forward (increasing Y)
+      car.worldPosition.y += carSpeed * dt;
+      
+      // Check if car has reached the end of the world
+      if (car.worldPosition.y >= worldHeight) {
+        carsToRemove.add(car);
+      } else {
+        // Update the visual representation of the car
+        updateCarProjection(car);
+      }
     }
     
-    // Update all cars to reflect their 3D position
-    for (final car in cars) {
-      updateCarProjection(car);
+    // Remove cars that have reached the end
+    for (final car in carsToRemove) {
+      car.removeFromParent();
+      cars.remove(car);
     }
   }
   
   void _addRandomCar() async {
-    // Generate random position within the visible world
-    // For front view, X is within the viewport range, Y is anywhere in the full range
+    // Generate random X position within the viewport range, Y always starts at 0
     final x = viewportMinX + random.nextDouble() * (viewportMaxX - viewportMinX);
-    final y = random.nextDouble() * viewportMaxY;
+    final y = 0.0; // Cars always start at the horizon
     
     // Choose a random car type
     final carTypes = CarType.values;
     final randomType = carTypes[random.nextInt(carTypes.length)];
     
-    // Create a new car - size doesn't matter as much since we'll scale it in updateCarProjection
+    // Create a new car with world position
+    final worldPosition = Vector2(x, y);
     final car = Car(
-      position: Vector2(x, y),
+      position: worldPosition.clone(), // Initial screen position matches world position
       size: Vector2(50, 30),
       carType: randomType,
     );
@@ -130,16 +141,56 @@ class CarGame extends FlameGame with TapCallbacks {
     updateCarProjection(car);
   }
   
-  void _removeRandomCar() {
-    if (cars.isEmpty) return;
+  void updateCarProjection(Car car) {
+    // In our world coordinates:
+    // - Higher Y values = closer to the viewer (bottom of screen)
+    // - Lower Y values = further from viewer (top of screen/horizon)
     
-    // Select a random car to remove
-    final index = random.nextInt(cars.length);
-    final car = cars[index];
+    // Skip cars outside our viewport
+    if (car.worldPosition.x < viewportMinX || car.worldPosition.x > viewportMaxX || 
+        car.worldPosition.y < viewportMinY || car.worldPosition.y > viewportMaxY) {
+      car.isVisible = false;
+      return;
+    }
     
-    // Remove from both the list and the game
-    cars.removeAt(index);
-    car.removeFromParent();
+    car.isVisible = true;
+    
+    // Calculate perspective values more explicitly
+    // closeness: 0.0 = furthest away (at horizon), 1.0 = closest to viewer
+    final closeness = car.worldPosition.y / viewportMaxY;
+    
+    // Convert world X to screen X with perspective
+    // - Objects in center stay in center
+    // - Objects off-center appear more centered as they get further away
+    final screenWidth = size.x;
+    final worldCenterX = worldWidth / 2;
+    final screenCenterX = screenWidth / 2;
+    final xOffsetFromCenter = car.worldPosition.x - worldCenterX;
+    // Apply less horizontal offset for distant objects (perspective narrowing)
+    final perspectiveAdjustedX = screenCenterX + xOffsetFromCenter * closeness;
+    
+    // Convert world Y to screen Y with perspective
+    // - High Y in world (close) = low Y on screen (bottom)
+    // - Low Y in world (far) = high Y on screen (top/horizon)
+    final screenHeight = size.y;
+    final horizonPosition = screenHeight * 0.4; // Horizon at 20% from top
+    final groundPosition = screenHeight * 0.6; // Ground at 90% from top (10% from bottom)
+    // Map world Y (0->500) to screen Y (horizon->ground)
+    final screenY = horizonPosition + (groundPosition - horizonPosition) * closeness;
+    
+    // Apply position
+    car.position = Vector2(perspectiveAdjustedX, screenY);
+    
+    // Scale based on distance - closer objects are larger
+    // Min scale = 0.2, Max scale = 1.0
+    final baseScale = 0.2;
+    final scaleRange = 0.8;
+    final scale = baseScale + (scaleRange * closeness);
+    car.scale = Vector2.all(scale);
+    
+    // Ensure closer objects render in front of distant objects
+    // Higher priority = rendered on top
+    car.priority = (1000 * closeness).toInt();
   }
   
   void handleSpottoPressed() {
@@ -173,58 +224,4 @@ class CarGame extends FlameGame with TapCallbacks {
       gameScore.numWrongFroggos++;
     }
   }
-  
-  // Update car's visual representation based on its position in 3D space
-  void updateCarProjection(Car car) {
-    // In our world coordinates:
-    // - Higher Y values = closer to the viewer (bottom of screen)
-    // - Lower Y values = further from viewer (top of screen/horizon)
-    
-    // Skip cars outside our viewport
-    if (car.worldPosition.x < viewportMinX || car.worldPosition.x > viewportMaxX || 
-        car.worldPosition.y < viewportMinY || car.worldPosition.y > viewportMaxY) {
-      car.isVisible = false;
-      return;
-    }
-    
-    car.isVisible = true;
-    
-    // Calculate perspective values more explicitly
-    // closeness: 0.0 = furthest away (at horizon), 1.0 = closest to viewer
-    final closeness = car.worldPosition.y / viewportMaxY;
-    
-    // Convert world X to screen X with perspective
-    // - Objects in center stay in center
-    // - Objects off-center appear more centered as they get further away
-    final screenWidth = size.x;
-    final worldCenterX = worldWidth / 2;
-    final screenCenterX = screenWidth / 2;
-    final xOffsetFromCenter = car.worldPosition.x - worldCenterX;
-    // Apply less horizontal offset for distant objects (perspective narrowing)
-    final perspectiveAdjustedX = screenCenterX + xOffsetFromCenter * closeness;
-    
-    // Convert world Y to screen Y with perspective
-    // - High Y in world (close) = low Y on screen (bottom)
-    // - Low Y in world (far) = high Y on screen (top/horizon)
-    final screenHeight = size.y;
-    final horizonPosition = screenHeight * 0.2; // Horizon at 20% from top
-    final groundPosition = screenHeight * 0.9; // Ground at 90% from top (10% from bottom)
-    // Map world Y (0->500) to screen Y (horizon->ground)
-    final screenY = horizonPosition + (groundPosition - horizonPosition) * closeness;
-    
-    // Apply position
-    car.position = Vector2(perspectiveAdjustedX, screenY);
-    
-    // Scale based on distance - closer objects are larger
-    // Min scale = 0.2, Max scale = 1.0
-    final baseScale = 0.2;
-    final scaleRange = 0.8;
-    final scale = baseScale + (scaleRange * closeness);
-    car.scale = Vector2.all(scale);
-    
-    // Ensure closer objects render in front of distant objects
-    // Higher priority = rendered on top
-    car.priority = (1000 * closeness).toInt();
-  }
-
 }
