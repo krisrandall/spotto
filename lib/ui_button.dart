@@ -32,7 +32,13 @@ class UIButton extends PositionComponent with TapCallbacks {
     this.color = Colors.blue,
     this.spritePath,
     this.priority = 0,
-  }) : super(position: position, size: size);
+  }) : super(
+         position: Vector2(
+           position.x,
+           position.y - (size.y.clamp(100, double.infinity) - size.y)
+         ), 
+         size: Vector2(size.x, size.y.clamp(100, double.infinity))
+       );
   
   @override
   Future<void> onLoad() async {
