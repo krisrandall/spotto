@@ -46,75 +46,81 @@ class CarGame extends FlameGame with TapCallbacks {
   bool hasBeenLoaded = false;
   
  @override
-Future<void> onLoad() async {
-  await super.onLoad();
-  
-  // Set up camera to view our 1000x1000 world
-  camera.viewfinder.visibleGameSize = Vector2(worldWidth, worldHeight);
-  camera.viewfinder.zoom = 1.0;
-  camera.moveTo(Vector2(worldWidth / 2, worldHeight / 2));
-  
-  // Create sky background (light blue above horizon)
-  skyBackground = RectangleComponent(
-    position: Vector2(0, 0),
-    size: Vector2(size.x, size.y * 0.3), // Horizon at 30% from top
-    paint: Paint()..color = const Color(0xFF87CEEB), // Light blue
-    priority: -2, // Ensure this is a very low number
-  );
-  
-  // Create road gradient background
-  roadBackground = GradientRectangleComponent(
-    position: Vector2(0, size.y * 0.3), // Start at horizon line
-    size: Vector2(size.x, size.y * 0.7), // Cover rest of screen
-    gradient: const LinearGradient(
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-      colors: [
-         Color(0xFF333333), // Dark grey
-         Color(0xFFAAAAAA), // Light grey
-      ],
-    ),
-    priority: -1, // Just above sky but still below everything else
-  );
-  
-  // Load windscreen overlay
-  final windscreenSprite = await Sprite.load('windscreen.png');
-  
-  // Create windscreen overlay that fills the screen
-  // while maintaining aspect ratio
-  final aspectRatio = windscreenSprite.srcSize.x / windscreenSprite.srcSize.y;
-  Vector2 windscreenSize;
-  
-  // Determine if we should fit to width or height
-  if (size.x / size.y > aspectRatio) {
-    // Screen is wider than windscreen, fit to width
-    windscreenSize = Vector2(size.x, size.x / aspectRatio);
-  } else {
-    // Screen is taller than windscreen, fit to height
-    windscreenSize = Vector2(size.y * aspectRatio, size.y);
+  Future<void> onLoad() async {
+    await super.onLoad();
+    
+    // Set up camera to view our 1000x1000 world
+    camera.viewfinder.visibleGameSize = Vector2(worldWidth, worldHeight);
+    camera.viewfinder.zoom = 1.0;
+    camera.moveTo(Vector2(worldWidth / 2, worldHeight / 2));
+    
+    // Create sky background (light blue above horizon)
+    skyBackground = RectangleComponent(
+      position: Vector2(0, 0),
+      size: Vector2(size.x, size.y * 0.3), // Horizon at 30% from top
+      paint: Paint()..color = const Color(0xFF87CEEB), // Light blue
+      priority: -2, // Ensure this is a very low number
+    );
+    
+    // Create road gradient background
+    roadBackground = GradientRectangleComponent(
+      position: Vector2(0, size.y * 0.3), // Start at horizon line
+      size: Vector2(size.x, size.y * 0.7), // Cover rest of screen
+      gradient: const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          Color(0xFF333333), // Dark grey
+          Color(0xFFAAAAAA), // Light grey
+        ],
+      ),
+      priority: -1, // Just above sky but still below everything else
+    );
+    
+    // Load windscreen overlay
+    final windscreenSprite = await Sprite.load('windscreen.png');
+    
+    // Create windscreen overlay that fills the screen
+    // while maintaining aspect ratio
+    final aspectRatio = windscreenSprite.srcSize.x / windscreenSprite.srcSize.y;
+    Vector2 windscreenSize;
+    
+    // Determine if we should fit to width or height
+    if (size.x / size.y > aspectRatio) {
+      // Screen is wider than windscreen, fit to width
+      windscreenSize = Vector2(size.x, size.x / aspectRatio);
+    } else {
+      // Screen is taller than windscreen, fit to height
+      windscreenSize = Vector2(size.y * aspectRatio, size.y);
+    }
+    
+    windscreen = SpriteComponent(
+      sprite: windscreenSprite,
+      position: Vector2(size.x / 2, size.y / 2), // Center on screen
+      size: windscreenSize,
+      anchor: Anchor.center,
+      priority: 50, // Above cars but below UI elements
+    );
+    
+    // Add background elements to the game world
+    add(skyBackground);
+    add(roadBackground);
+    
+    // Add windscreen to the viewport instead of game world
+    camera.viewport.add(windscreen);
+    
+    // Pre-load the wrong indicator sprite
+    await images.load('wrong.png');
+
+    // lets add  initial cars and trees
+    for (int i = 0; i < 5; i++) {
+      _addRandomCar();
+      _addRandomTree();
+    }
+    
+    // Mark that the game has been loaded
+    hasBeenLoaded = true;
   }
-  
-  windscreen = SpriteComponent(
-    sprite: windscreenSprite,
-    position: Vector2(size.x / 2, size.y / 2), // Center on screen
-    size: windscreenSize,
-    anchor: Anchor.center,
-    priority: 50, // Above cars but below UI elements
-  );
-  
-  // Add background elements to the game world
-  add(skyBackground);
-  add(roadBackground);
-  
-  // Add windscreen to the viewport instead of game world
-  camera.viewport.add(windscreen);
-  
-  // Pre-load the wrong indicator sprite
-  await images.load('wrong.png');
-  
-  // Mark that the game has been loaded
-  hasBeenLoaded = true;
-}
 
   @override
   void onGameResize(Vector2 canvasSize) {
@@ -184,12 +190,12 @@ Future<void> onLoad() async {
     super.update(dt);
     
     // 1 in 100 chance to add a new car
-    if (random.nextInt(100) == 0) {
+    if (random.nextInt(50) == 0) {
       _addRandomCar();
     }
 
     // 1 in 100 chance to add a new tree
-    if (random.nextInt(100) == 0) {
+    if (random.nextInt(110) == 0) {
       _addRandomTree();
     }
     
@@ -260,8 +266,14 @@ Future<void> onLoad() async {
   
   void _addRandomCar() async {
     // Generate random X position within the viewport range, Y always starts at 0
-    final x = viewportMinX + random.nextDouble() * (viewportMaxX - viewportMinX);
-    final y = 0.0; // Cars always start at the horizon
+    const howFarFromSides = ((viewportMaxX - viewportMinX) / 2)- 50;
+    final x = random.nextDouble() < 0.5 ? 
+      viewportMinX + random.nextDouble() * howFarFromSides : 
+      viewportMaxX - random.nextDouble() * howFarFromSides;
+    const y = 0.0; // Cars always start at the horizon
+
+
+    //print('x: $x   --- $viewportMinX  --- $viewportMaxX --- $howFarFromSides');
     
     // Choose a random car type
     final carTypes = CarType.values;
@@ -285,7 +297,10 @@ Future<void> onLoad() async {
 
   void _addRandomTree() async {
     // Generate random X position within the viewport range, Y always starts at 0
-    final x = viewportMinX + random.nextDouble() * (viewportMaxX - viewportMinX);
+    const howFarFromSides = ((viewportMaxX - viewportMinX) / 2)- 100;
+    final x = random.nextDouble() < 0.5 ? 
+      viewportMinX + random.nextDouble() * howFarFromSides : 
+      viewportMaxX - random.nextDouble() * howFarFromSides;
     final y = 0.0; // Trees always start at the horizon
     
     final worldPosition = Vector2(x, y);
