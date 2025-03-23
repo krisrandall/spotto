@@ -5,9 +5,11 @@ import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flame/palette.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spotto/tree.dart';
 import 'package:spotto/world_object.dart';
 import 'package:spotto/title_screen.dart';
+import 'package:spotto/game_timer.dart';
 import 'car.dart';
 import 'game_score.dart';
 import 'ui_button.dart';
@@ -42,6 +44,12 @@ class CarGame extends FlameGame with TapCallbacks {
   final Random random = Random();
   final GameScore gameScore = GameScore();
   
+  // Current play mode
+  PlayMode? _currentPlayMode;
+  
+  // Game timer
+  GameTimer? _gameTimer;
+  
   // Background elements
   late RectangleComponent skyBackground;
   late GradientRectangleComponent roadBackground;
@@ -57,6 +65,33 @@ class CarGame extends FlameGame with TapCallbacks {
 
   bool hasBeenLoaded = false;
   
+
+  @override
+  void onTapUp(TapUpEvent event) {
+    // Check if we're in playing state
+    if (_gameState == GameState.playing) {
+      // Check for timer button tap in unlimited mode
+      if (_gameTimer != null && _currentPlayMode?.durationInSeconds == null) {
+        final buttonPosition = _gameTimer!.position + Vector2(0, 25); // Position of the Finish Trip button
+        final buttonSize = Vector2(80, 20);
+        
+        final buttonRect = Rect.fromLTWH(
+          buttonPosition.x,
+          buttonPosition.y,
+          buttonSize.x,
+          buttonSize.y
+        );
+        
+        if (buttonRect.contains(event.canvasPosition.toOffset())) {
+          _endGame();
+          return;
+        }
+      }
+    }
+    
+    super.onTapUp(event);
+  }
+
  @override
   Future<void> onLoad() async {
     await super.onLoad();
@@ -85,6 +120,8 @@ class CarGame extends FlameGame with TapCallbacks {
         'wrong.png',
         'spotto.png',
         'froggo.png',
+        'yellow.png',
+        'green.png',
       ]);
     } catch (e) {
       print('Warning: Some assets failed to load: $e');
@@ -94,9 +131,9 @@ class CarGame extends FlameGame with TapCallbacks {
   
   // Method to load the title screen
   Future<void> _loadTitleScreen() async {
-    // Create the title screen
+    // Create the title screen with callback
     titleScreen = TitleScreen(
-      onStartGame: _startGame,
+      onStartGame: _startGameWithMode,
     );
     
     // Add it to the camera's viewport, not the world
@@ -106,8 +143,15 @@ class CarGame extends FlameGame with TapCallbacks {
     _gameState = GameState.titleScreen;
   }
   
-  // Method to start the game (called when start button is pressed)
-  void _startGame() {
+  // Method to start the game with a specific play mode
+  void _startGameWithMode(PlayMode playMode) {
+    // Store the current play mode
+    _currentPlayMode = playMode;
+    
+    // Set the game score mode
+    gameScore.isUnlimitedMode = (playMode.durationInSeconds == null);
+    gameScore.reset();
+    
     // Change game state to playing first (prevents resizing issues)
     _gameState = GameState.playing;
     
@@ -179,6 +223,9 @@ class CarGame extends FlameGame with TapCallbacks {
     // Add windscreen to the viewport instead of game world
     camera.viewport.add(windscreen);
     
+    // Add the game timer
+    _addGameTimer();
+    
     // Pre-load the wrong indicator sprite
     await images.load('wrong.png');
 
@@ -190,6 +237,22 @@ class CarGame extends FlameGame with TapCallbacks {
     
     // Add UI elements (buttons and score display)
     _setupUIElements();
+  }
+  
+  void _addGameTimer() {
+    // Position the timer in the top right corner with padding
+    final timerPosition = Vector2(size.x - 100, 20);
+    
+    // Create the timer component with the specified duration and callback
+    _gameTimer = GameTimer(
+      position: timerPosition,
+      durationInSeconds: _currentPlayMode?.durationInSeconds,
+      onFinishPressed: _endGame,
+      priority: 100,
+    );
+    
+    // Add the timer to the viewport
+    camera.viewport.add(_gameTimer!);
   }
   
   void _setupUIElements() {
@@ -262,6 +325,11 @@ class CarGame extends FlameGame with TapCallbacks {
       windscreen.size = windscreenSize;
       windscreen.position = Vector2(canvasSize.x / 2, canvasSize.y / 2);
       
+      // Update timer position if it exists
+      if (_gameTimer != null && _gameTimer!.isMounted) {
+        _gameTimer!.position = Vector2(canvasSize.x - 100, 20);
+      }
+      
       // Re-setup UI elements
       _setupUIElements();
     }
@@ -273,6 +341,12 @@ class CarGame extends FlameGame with TapCallbacks {
     
     // Only update game logic if in playing state
     if (_gameState != GameState.playing) {
+      return;
+    }
+    
+    // Check if timer has finished (for timed modes)
+    if (_gameTimer != null && _gameTimer!.isFinished && _currentPlayMode?.durationInSeconds != null) {
+      _endGame();
       return;
     }
     
@@ -341,6 +415,60 @@ class CarGame extends FlameGame with TapCallbacks {
         wrongIndicator = null;
       }
     }
+  }
+  
+  // End the current game and return to title screen
+  void _endGame() async {
+    // Save the game duration
+    if (_gameTimer != null) {
+      gameScore.gameDurationInSeconds = _gameTimer!.isCountingDown ? 
+          (_currentPlayMode?.durationInSeconds ?? 0) : 
+          _gameTimer!.elapsedSeconds;
+    }
+    
+    // Save the score
+    await gameScore.saveScore();
+    
+    // Clean up game elements
+    _cleanupGameElements();
+    
+    // Load the title screen
+    await _loadTitleScreen();
+  }
+  
+  void _cleanupGameElements() {
+    // Remove all cars and trees
+    for (final car in List<Car>.from(cars)) {
+      car.removeFromParent();
+    }
+    cars.clear();
+    
+    for (final tree in List<Tree>.from(trees)) {
+      tree.removeFromParent();
+    }
+    trees.clear();
+    
+    // Remove background elements
+    try {
+      skyBackground.removeFromParent();
+      roadBackground.removeFromParent();
+      windscreen.removeFromParent();
+    } catch (e) {
+      print('Warning: Error removing background elements: $e');
+    }
+    
+    // Remove timer
+    if (_gameTimer != null) {
+      _gameTimer!.removeFromParent();
+      _gameTimer = null;
+    }
+    
+    // Remove UI elements
+    camera.viewport.children.whereType<UIButton>().forEach((button) => button.removeFromParent());
+    camera.viewport.children.whereType<ScoreDisplay>().forEach((display) => display.removeFromParent());
+    
+    // Reset game state
+    _gameState = GameState.titleScreen;
   }
   
   void _addRandomCar() async {
@@ -512,6 +640,8 @@ class CarGame extends FlameGame with TapCallbacks {
       showWrongIndicator();
     }
   }
+
+
 }
 
 // Custom component for gradient rectangle
