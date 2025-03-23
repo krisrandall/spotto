@@ -12,6 +12,8 @@ The family car game of "Spotto" but as a mobile app
   <img src="assets/app_stores/ss5.png" width="160" />
 </p>
 
+<!-- NB: these images made using : https://theapplaunchpad.com/projects  (but need to copy-paste them and then resize using app magic -->
+
 ---
 
 
