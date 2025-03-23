@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:spotto/ui_button.dart';
-import 'package:spotto/car.dart';
 
 class PlayMode {
   final String name;
@@ -20,7 +19,7 @@ class PlayMode {
 
 class TitleScreen extends PositionComponent with HasGameRef {
   // Title screen properties
-  RectangleComponent? _backgroundRect;
+  PositionComponent? _backgroundRect;
   TextComponent? _titleText;
   TextComponent? _versionText;
   
@@ -78,12 +77,33 @@ class TitleScreen extends PositionComponent with HasGameRef {
   }
   
   void _createBackground() {
-    _backgroundRect = RectangleComponent(
-      size: size,
-      paint: Paint()..color = const Color(0xFFF5FFDC), // Light lime yellow
-      priority: 1,
-    );
-    add(_backgroundRect!);
+    gameRef.images.load('title_bg.png').then((image) {
+      final bgSprite = Sprite(image);
+      
+      // Calculate scale to fill width or height while maintaining aspect ratio
+      final imageRatio = image.width / image.height;
+      final screenRatio = size.x / size.y;
+      
+      final scale = imageRatio > screenRatio 
+          ? size.y / image.height  // Height-constrained
+          : size.x / image.width;  // Width-constrained
+      
+      final scaledWidth = image.width * scale;
+      final scaledHeight = image.height * scale;
+      
+      // Center the image
+      final x = (size.x - scaledWidth) / 2;
+      final y = (size.y - scaledHeight) / 2;
+      
+      _backgroundRect = SpriteComponent(
+        sprite: bgSprite,
+        position: Vector2(x, y),
+        size: Vector2(scaledWidth, scaledHeight),
+        priority: 1,
+      );
+      
+      add(_backgroundRect!);
+    });
   }
   
   Future<void> _createUIElements() async {
@@ -93,7 +113,7 @@ class TitleScreen extends PositionComponent with HasGameRef {
       textRenderer: TextPaint(
         style: const TextStyle(
           fontSize: 80.0,
-          color: Colors.black, // bright yellow
+          color: Colors.yellow, // bright yellow
           fontWeight: FontWeight.bold,
           shadows: [
             Shadow(
@@ -527,12 +547,19 @@ Future<void> _addInstructionSection() async {
     
     // Add top and bottom bands with adjusted positions
     final topBand = RectangleComponent(
-      position: Vector2(0, portrait ? size.y * 0.06 : size.y * 0.08),
+      position: Vector2(0, portrait ? size.y * 0.001 : size.y * 0.001),
       size: Vector2(size.x, 3),
       paint: Paint()..color =  Colors.yellow,
       priority: 2,
     );
     add(topBand);
+    final reallBottomBand = RectangleComponent(
+      position: Vector2(0, portrait ? size.y * 0.995 : size.y * 0.995),
+      size: Vector2(size.x, 3),
+      paint: Paint()..color =  Colors.yellow,
+      priority: 2,
+    );
+    add(reallBottomBand);
     
     final bottomBand = RectangleComponent(
       position: Vector2(0, portrait ? size.y * 0.65 : size.y * 0.75),
