@@ -15,6 +15,19 @@ The family car game of "Spotto" but as a mobile app.
 ---
 
 
+<p align="center">
+  <a href="https://play.google.com/store/apps/details?id=au.com.cocreations.spotto" target="_blank">
+    <img src="assets/app_stores/button_play_store.png" width="160" />
+  </a>
+  <span> &nbsp; &nbsp; </span>
+  <a href="https://apps.apple.com/us/app/spotto-game/id6743664057" target="_blank">
+    <img src="assets/app_stores/button_app_store.png" width="160" />
+  </a>
+</p>
+
+---
+
+
 Family car trips just got a whole lot more fun!
 
 The game of Spotto is simple;    
