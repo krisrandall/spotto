@@ -1,4 +1,4 @@
-// ui_button.dart
+// ui_button.dart - Updated with text size parameter
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flutter/material.dart';
@@ -9,15 +9,9 @@ class UIButton extends PositionComponent with TapCallbacks {
   final Function onPressed;
   final Color color;
   final int priority;
+  final double textSize;
 
-  final TextPaint textPaint = TextPaint(
-
-    style: const TextStyle(
-      fontSize: 24.0,
-      color: Colors.white,
-      fontWeight: FontWeight.bold,
-    ),
-  );
+  late final TextPaint textPaint;
   
   // For sprite buttons
   Sprite? buttonSprite;
@@ -32,13 +26,20 @@ class UIButton extends PositionComponent with TapCallbacks {
     this.color = Colors.blue,
     this.spritePath,
     this.priority = 0,
+    this.textSize = 24.0,
   }) : super(
-         position: Vector2(
-           position.x,
-           position.y - (size.y.clamp(100, double.infinity) - size.y)
-         ), 
-         size: Vector2(size.x, size.y.clamp(100, double.infinity))
-       );
+         position: position,
+         size: size,
+         priority: priority,
+       ) {
+    textPaint = TextPaint(
+      style: TextStyle(
+        fontSize: textSize,
+        color: Colors.white,
+        fontWeight: FontWeight.bold,
+      ),
+    );
+  }
   
   @override
   Future<void> onLoad() async {
@@ -46,8 +47,12 @@ class UIButton extends PositionComponent with TapCallbacks {
     
     // Load sprite if spritePath is provided
     if (spritePath != null && !_spriteLoaded) {
-      buttonSprite = await Sprite.load(spritePath!);
-      _spriteLoaded = true;
+      try {
+        buttonSprite = await Sprite.load(spritePath!);
+        _spriteLoaded = true;
+      } catch (e) {
+        print('Error loading button sprite: $e');
+      }
     }
   }
   

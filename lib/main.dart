@@ -1,4 +1,5 @@
-// main.dart
+// In main.dart, we need to ensure we're not locking orientation:
+
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,10 +9,12 @@ void main() {
   // Ensure Flutter is initialized
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Set preferred orientations to portrait only
+  // Allow both orientations - IMPORTANT for rotation to work
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
   ]);
   
   // Set full screen mode

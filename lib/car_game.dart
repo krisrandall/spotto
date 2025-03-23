@@ -143,7 +143,7 @@ class CarGame extends FlameGame with TapCallbacks {
     _gameState = GameState.titleScreen;
   }
   
-  // Method to start the game with a specific play mode
+
   void _startGameWithMode(PlayMode playMode) {
     // Store the current play mode
     _currentPlayMode = playMode;
@@ -152,12 +152,14 @@ class CarGame extends FlameGame with TapCallbacks {
     gameScore.isUnlimitedMode = (playMode.durationInSeconds == null);
     gameScore.reset();
     
+    // Print selected mode for debugging
+    print('Starting game with mode: ${playMode.name}, duration: ${playMode.durationInSeconds ?? "unlimited"} seconds');
+    
     // Change game state to playing first (prevents resizing issues)
     _gameState = GameState.playing;
     
     // Remove the title screen
     if (titleScreen != null) {
-      print('Removing title screen');
       titleScreen!.removeFromParent();
       titleScreen = null;
     }
@@ -165,7 +167,7 @@ class CarGame extends FlameGame with TapCallbacks {
     // Load the game elements
     _loadGameElements();
   }
-  
+    
   // Load all game elements
   Future<void> _loadGameElements() async {
     // Create sky background (light blue above horizon)
