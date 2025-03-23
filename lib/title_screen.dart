@@ -574,7 +574,6 @@ Future<void> _addInstructionSection() async {
   void onGameResize(Vector2 canvasSize) {
     super.onGameResize(canvasSize);
     
-
     // Store the old size for comparison
     final Vector2 oldSize = size.clone();
     final bool wasPortrait = oldSize.y > oldSize.x;
@@ -587,13 +586,16 @@ Future<void> _addInstructionSection() async {
     final bool orientationChanged = wasPortrait != isPortraitNow;
     
     if (orientationChanged) {
- 
       // For orientation changes, remove everything and rebuild from scratch
       removeAll(children);
+      _playButtons.clear(); // Clear the buttons list
       
       // Re-initialize components with the new size/orientation
       _createBackground();
-      _createUIElements();
+      // Wait for next frame before creating UI elements to ensure clean state
+      Future.delayed(Duration.zero, () async {
+        await _createUIElements();
+      });
       
       return;
     }
