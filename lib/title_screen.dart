@@ -92,8 +92,8 @@ class TitleScreen extends PositionComponent with HasGameRef {
       text: 'SPOTTO',
       textRenderer: TextPaint(
         style: const TextStyle(
-          fontSize: 60.0,
-          color: Color(0xFF2E8B57), // Sea green
+          fontSize: 80.0,
+          color: Colors.black, // bright yellow
           fontWeight: FontWeight.bold,
           shadows: [
             Shadow(
@@ -529,7 +529,7 @@ Future<void> _addInstructionSection() async {
     final topBand = RectangleComponent(
       position: Vector2(0, portrait ? size.y * 0.06 : size.y * 0.08),
       size: Vector2(size.x, 3),
-      paint: Paint()..color = const Color(0xFF2E8B57).withOpacity(0.7), // Sea green matching title
+      paint: Paint()..color =  Colors.yellow,
       priority: 2,
     );
     add(topBand);
@@ -537,7 +537,7 @@ Future<void> _addInstructionSection() async {
     final bottomBand = RectangleComponent(
       position: Vector2(0, portrait ? size.y * 0.65 : size.y * 0.75),
       size: Vector2(size.x, 3),
-      paint: Paint()..color = const Color(0xFF2E8B57).withOpacity(0.7), // Sea green matching title
+      paint: Paint()..color =  Colors.yellow,
       priority: 2,
     );
     add(bottomBand);
@@ -547,9 +547,7 @@ Future<void> _addInstructionSection() async {
   void onGameResize(Vector2 canvasSize) {
     super.onGameResize(canvasSize);
     
-    // Log resize for debugging
-    print('TitleScreen resized: $canvasSize, was: $size');
-    
+
     // Store the old size for comparison
     final Vector2 oldSize = size.clone();
     final bool wasPortrait = oldSize.y > oldSize.x;
@@ -562,8 +560,7 @@ Future<void> _addInstructionSection() async {
     final bool orientationChanged = wasPortrait != isPortraitNow;
     
     if (orientationChanged) {
-      print('Orientation changed: ${wasPortrait ? 'portrait' : 'landscape'} to ${isPortraitNow ? 'portrait' : 'landscape'}');
-      
+ 
       // For orientation changes, remove everything and rebuild from scratch
       removeAll(children);
       
