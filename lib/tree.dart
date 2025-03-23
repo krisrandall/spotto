@@ -17,6 +17,36 @@ enum TreeType {
   ),
   tree4(
     sprite: 'tree4.png',
+  ),
+  t1(
+    sprite: 't1.png',
+  ),
+  t2(
+    sprite: 't2.png',
+  ),
+  t3(
+    sprite: 't3.png',
+  ),
+  t4(
+    sprite: 't4.png',
+  ),
+  tr2(
+    sprite: 'tr2.png',
+  ),
+  tr3(
+    sprite: 'tr3.png',
+  ),
+  tr4(
+    sprite: 'tr4.png',
+  ),
+  b4(
+    sprite: 'b4.png',
+  ),
+  b2(
+    sprite: 'b2.png',
+  ),
+  b3(
+    sprite: 'b3.png',
   );
 
   final String sprite;
