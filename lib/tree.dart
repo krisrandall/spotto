@@ -18,9 +18,6 @@ enum TreeType {
   tree4(
     sprite: 'tree4.png',
   ),
-  t1(
-    sprite: 't1.png',
-  ),
   t2(
     sprite: 't2.png',
   ),
